@@ -1,7 +1,10 @@
+[README.md](https://github.com/user-attachments/files/29932618/README.md)
 # BTC Regime Monitor (₿ 레짐 모니터)
 
 비트코인 시장이 **횡보장인지 추세장인지** 자동 판별해서 텔레그램으로 알려주는 모니터.
-그리드매매 가동/중단 판단 보조용. 완전 무료 (Binance 공개 API + GitHub Actions + Telegram).
+그리드매매 가동/중단 판단 보조용. 완전 무료 (Coinbase 공개 API [업비트 백업] + GitHub Actions + Telegram).
+
+> 참고: 바이낸스 API는 GitHub Actions(미국 IP)를 451로 차단해서 사용 불가.
 
 ## 판단 로직
 | 지표 | 기준 |
