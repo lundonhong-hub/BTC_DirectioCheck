@@ -190,8 +190,7 @@ def generate_ai_commentary(indicators: dict):
         return None
 
     # 들여쓰기 에러 방지를 위해 왼쪽 공백을 완벽하게 맞춘 프롬프트
-    
-      prompt = (
+    prompt = (
         f"다음은 비트코인 시장 레짐 모니터의 오늘 지표입니다:\n"
         f"- 현재가: {indicators['price_str']}\n"
         f"- 레짐 판정: {indicators['regime_kr']}\n"
@@ -212,7 +211,6 @@ def generate_ai_commentary(indicators: dict):
         f"📈 추세/심리: [장기 이평선 기울기와 공포탐욕지수를 바탕으로 한 추세 및 투자 심리 진단]\n"
         f"🤖 그리드 전략: [현재 레짐 국면에서 그리드매매/수동매매 시 주의하거나 취해야 할 스탠스]"
     )
-    
 
     try:
         r = requests.post(
@@ -237,33 +235,6 @@ def generate_ai_commentary(indicators: dict):
     except Exception as e:
         print(f"[WARN] AI 해설 생성 실패({e}) -> 해설 없이 발송")
         return None
-
-
-  
-    try:
-        r = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": "claude-haiku-4-5-20251001",
-                "max_tokens": 500,
-                "messages": [{"role": "user", "content": prompt}],
-            },
-            timeout=60,
-        )
-        r.raise_for_status()
-        data = r.json()
-        text = "".join(b.get("text", "") for b in data.get("content", [])
-                       if b.get("type") == "text").strip()
-        return html_escape(text) if text else None
-    except Exception as e:
-        print(f"[WARN] AI 해설 생성 실패({e}) -> 해설 없이 발송")
-        return None
-
 
 def send_telegram(msg):
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
