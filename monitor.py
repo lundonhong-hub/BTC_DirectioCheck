@@ -164,23 +164,49 @@ def generate_ai_commentary(indicators: dict):
         print("[INFO] ANTHROPIC_API_KEY 미설정 -> AI 해설 생략")
         return None
 
-    prompt = f"""다음은 비트코인 시장 레짐 모니터의 오늘 지표입니다:
 
-- 현재가: {indicators['price_str']}
-- 레짐 판정: {indicators['regime_kr']}
-- ADX(14): {indicators['adx']:.1f} (22 미만이면 횡보, 28 초과면 추세)
-- +DI: {indicators['plus_di']:.1f} / -DI: {indicators['minus_di']:.1f} (상승 힘 vs 하락 힘)
-- 볼린저밴드 폭 백분위: {indicators['bbw_pctl']*100:.0f}% (낮으면 변동성 수축, 높으면 확장)
-- 장기 이동평균선 기울기(10일): {indicators['ma_slope']:+.2f}%
-- Fear & Greed Index: {indicators['fng']}
+      prompt = f"""다음은 비트코인 시장 레짐 모니터의 오늘 지표입니다:
+      
+      - 현재가: {indicators['price_str']}
+      - 레짐 판정: {indicators['regime_kr']}
+      - ADX(14): {indicators['adx']:.1f} (22 미만 횡보, 28 초과 추세)
+      - +DI: {indicators['plus_di']:.1f} / -DI: {indicators['minus_di']:.1f}
+      - 볼린저밴드 폭 백분위: {indicators['bbw_pctl']*100:.0f}%
+      - 장기 이동평균선 기울기(10일): {indicators['ma_slope']:+.2f}%
+      - Fear & Greed Index: {indicators['fng']}
+      
+      위 지표를 종합하여 텔레그램 알림용 '초압축 핵심 요약'을 작성해주세요.
+      
+      [출력 규칙]
+      1. 반드시 아래의 [출력 양식] 형식을 그대로 유지하세요.
+      2. 친절하고 장황한 설명 대신, 트레이더가 한눈에 파악할 수 있도록 단답형/개조식 문체(~함, ~임)를 사용하세요.
+      3. 매수/매도 추천은 절대 금지하며, 마크다운이나 HTML 태그 없이 순수 텍스트로만 작성하세요.
+      4. 전체 분량은 공백 포함 180자 이내로 제한합니다.
+      
+      [출력 양식]
+      📢 요약: [시장 상황을 한 줄로 명확하게 두괄식 요약]
+      🔍 지표 분석:
+      • 수치 해석: [ADX, DI, 밴드폭 등 주요 지표의 핵심 의미를 한 문장으로 압축]
+      • 심리/추세: [기울기와 공포탐욕지수가 뜻하는 바를 한 문장으로 압축]
+      🤖 그리드 전략: [그리드매매 관점에서의 대응 팁 한 줄]"""
+  
+#     prompt = f"""다음은 비트코인 시장 레짐 모니터의 오늘 지표입니다:
 
-이 지표들을 종합해서 투자 초보자도 이해할 수 있게 한국어로 해설해주세요.
-규칙:
-- 첫 문장은 오늘 시장을 한 줄로 요약
-- 이어서 3~5문장으로 핵심 지표들이 무엇을 의미하는지 쉽게 풀어서 설명
-- 그리드매매(횡보장 전략) 관점에서 지금이 어떤 국면인지 한 문장 코멘트
-- 매수/매도 추천은 하지 말 것. 해석만 제공
-- 전체 250자 이내, 마크다운/HTML 태그 없이 순수 텍스트로만"""
+# - 현재가: {indicators['price_str']}
+# - 레짐 판정: {indicators['regime_kr']}
+# - ADX(14): {indicators['adx']:.1f} (22 미만이면 횡보, 28 초과면 추세)
+# - +DI: {indicators['plus_di']:.1f} / -DI: {indicators['minus_di']:.1f} (상승 힘 vs 하락 힘)
+# - 볼린저밴드 폭 백분위: {indicators['bbw_pctl']*100:.0f}% (낮으면 변동성 수축, 높으면 확장)
+# - 장기 이동평균선 기울기(10일): {indicators['ma_slope']:+.2f}%
+# - Fear & Greed Index: {indicators['fng']}
+
+# 이 지표들을 종합해서 투자 초보자도 이해할 수 있게 한국어로 해설해주세요.
+# 규칙:
+# - 첫 문장은 오늘 시장을 한 줄로 요약
+# - 이어서 3~5문장으로 핵심 지표들이 무엇을 의미하는지 쉽게 풀어서 설명
+# - 그리드매매(횡보장 전략) 관점에서 지금이 어떤 국면인지 한 문장 코멘트
+# - 매수/매도 추천은 하지 말 것. 해석만 제공
+# - 전체 250자 이내, 마크다운/HTML 태그 없이 순수 텍스트로만"""
 
     try:
         r = requests.post(
@@ -271,8 +297,8 @@ def main():
     # 2) 정기 리포트: KST 09시(UTC 00시) 실행분만 발송
     # 그 외 시간대: 발송 안 함 (체크만 하고 조용히 종료, AI 호출도 없음)
     now_utc = datetime.now(timezone.utc)
-    is_daily_report_hour = (now_utc.hour == 0)  # UTC 00시 = KST 09시
-    # is_daily_report_hour = True
+    # is_daily_report_hour = (now_utc.hour == 0)  # UTC 00시 = KST 09시
+    is_daily_report_hour = True
 
     if regime_changed or is_daily_report_hour:
         # 발송이 확정된 경우에만 AI 해설 생성 (Haiku 헛호출 방지)
