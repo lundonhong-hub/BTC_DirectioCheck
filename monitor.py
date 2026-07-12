@@ -16,7 +16,8 @@ import requests
 import pandas as pd
 from datetime import datetime, timezone
 
-BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
+COINBASE_CANDLES_URL = "https://api.exchange.coinbase.com/products/BTC-USD/candles"
+UPBIT_CANDLES_URL = "https://api.upbit.com/v1/candles/days"
 FNG_URL = "https://api.alternative.me/fng/?limit=2"
 STATE_FILE = "last_state.json"  # 레짐 상태 저장 (전환 감지용)
 
@@ -28,17 +29,50 @@ BBW_PCTL_WINDOW = 120   # 볼린저밴드 폭 백분위 계산 기간(일)
 
 
 def fetch_btc_daily(limit=300):
-    """Binance에서 BTC/USDT 일봉 데이터 수집 (무료, 키 불필요)"""
-    params = {"symbol": "BTCUSDT", "interval": "1d", "limit": limit}
-    r = requests.get(BINANCE_KLINES_URL, params=params, timeout=30)
+    """BTC 일봉 수집. 1순위 Coinbase(USD), 실패 시 업비트(KRW) 백업.
+    (바이낸스는 GitHub Actions의 미국 IP를 451로 차단하므로 사용 불가)"""
+    try:
+        return _fetch_coinbase_daily(limit)
+    except Exception as e:
+        print(f"[WARN] Coinbase 실패({e}) -> 업비트로 재시도")
+        return _fetch_upbit_daily(min(limit, 200))
+
+
+def _fetch_coinbase_daily(limit=300):
+    """Coinbase Exchange 공개 API (무료, 키 불필요, 최대 300개)"""
+    params = {"granularity": 86400}  # 1일봉
+    r = requests.get(COINBASE_CANDLES_URL, params=params, timeout=30,
+                     headers={"User-Agent": "btc-regime-monitor"})
     r.raise_for_status()
-    cols = ["open_time", "open", "high", "low", "close", "volume",
-            "close_time", "qav", "trades", "tbbav", "tbqav", "ignore"]
-    df = pd.DataFrame(r.json(), columns=cols)
+    # 응답: [[time, low, high, open, close, volume], ...] 최신순
+    rows = r.json()[:limit]
+    df = pd.DataFrame(rows, columns=["ts", "low", "high", "open", "close", "volume"])
+    df["date"] = pd.to_datetime(df["ts"], unit="s")
+    df = df.sort_values("date").reset_index(drop=True)
     for c in ["open", "high", "low", "close", "volume"]:
         df[c] = df[c].astype(float)
-    df["date"] = pd.to_datetime(df["open_time"], unit="ms")
+    df.attrs["currency"] = "USD"
     return df[["date", "open", "high", "low", "close", "volume"]]
+
+
+def _fetch_upbit_daily(limit=200):
+    """업비트 공개 API 백업 (무료, 키 불필요, 최대 200개, KRW 표시)"""
+    params = {"market": "KRW-BTC", "count": limit}
+    r = requests.get(UPBIT_CANDLES_URL, params=params, timeout=30)
+    r.raise_for_status()
+    rows = r.json()  # 최신순
+    df = pd.DataFrame([{
+        "date": row["candle_date_time_utc"],
+        "open": row["opening_price"],
+        "high": row["high_price"],
+        "low": row["low_price"],
+        "close": row["trade_price"],
+        "volume": row["candle_acc_trade_volume"],
+    } for row in rows])
+    df["date"] = pd.to_datetime(df["date"])
+    df = df.sort_values("date").reset_index(drop=True)
+    df.attrs["currency"] = "KRW"
+    return df
 
 
 def compute_adx(df, period=14):
@@ -143,11 +177,16 @@ def main():
     bbw_recent = bbw.tail(BBW_PCTL_WINDOW).dropna()
     bbw_pctl = (bbw_recent < bbw_now).mean()  # 최근 구간 내 백분위
 
-    ma200 = df["close"].rolling(200).mean()
-    # 200일선 최근 10일 기울기 (%)
+    # 장기 이평: 데이터 여유 있으면 200일, 부족하면(업비트 백업 등) 120일로 자동 축소
+    ma_window = 200 if len(df) >= 220 else 120
+    ma200 = df["close"].rolling(ma_window).mean()
+    # 장기 이평 최근 10일 기울기 (%)
     ma200_slope_pct = (ma200.iloc[-1] / ma200.iloc[-11] - 1) * 100
 
     fng_value, fng_label = fetch_fear_greed()
+
+    currency = df.attrs.get("currency", "USD")
+    price_str = f"${price_now:,.0f}" if currency == "USD" else f"₩{price_now:,.0f}"
 
     regime = classify_regime(adx_now, bbw_pctl, ma200_slope_pct)
     last_regime = load_last_state()
@@ -156,7 +195,7 @@ def main():
     lines = [
         f"<b>₿ BTC 레짐 모니터</b>  ({datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')} UTC)",
         "",
-        f"현재가: ${price_now:,.0f}",
+        f"현재가: {price_str}",
         f"레짐: <b>{REGIME_KR[regime]}</b>",
     ]
     if regime_changed:
@@ -167,7 +206,7 @@ def main():
         f"· ADX(14): {adx_now:.1f}  (횡보<{ADX_RANGING_MAX} / 추세>{ADX_TRENDING_MIN})",
         f"· +DI/-DI: {plus_di.iloc[-1]:.1f} / {minus_di.iloc[-1]:.1f}",
         f"· BB밴드폭 백분위: {bbw_pctl*100:.0f}% (높을수록 변동성 확장)",
-        f"· 200일선 기울기(10일): {ma200_slope_pct:+.2f}%",
+        f"· {ma_window}일선 기울기(10일): {ma200_slope_pct:+.2f}%",
     ]
     if fng_value is not None:
         lines.append(f"· Fear & Greed: {fng_value} ({fng_label})")
