@@ -212,7 +212,7 @@ def generate_ai_commentary(indicators: dict):
         f"📈 추세/심리: [장기 이평선 기울기와 공포탐욕지수를 바탕으로 한 추세 및 투자 심리 진단]\n"
         f"🤖 그리드 전략: [현재 레짐 국면에서 그리드매매/수동매매 시 주의하거나 취해야 할 스탠스]"
     )
-    )
+    
 
     try:
         r = requests.post(
