@@ -266,35 +266,37 @@ def main():
     if fng_value is not None:
         lines.append(f"· Fear & Greed: {fng_value} ({fng_label})")
 
-    # ── AI 해설 (Claude Haiku) ──
-    ai_comment = generate_ai_commentary({
-        "price_str": price_str,
-        "regime_kr": REGIME_KR[regime],
-        "adx": adx_now,
-        "plus_di": plus_di.iloc[-1],
-        "minus_di": minus_di.iloc[-1],
-        "bbw_pctl": bbw_pctl,
-        "ma_slope": ma200_slope_pct,
-        "fng": f"{fng_value} ({fng_label})" if fng_value is not None else "N/A",
-    })
-    if ai_comment:
-        lines += ["", "💬 <b>AI 해설</b>", ai_comment]
-
-    msg = "\n".join(lines)
-
     # ── 알림 정책 ──────────────────────────────────────
     # 1) 레짐 전환 감지 시: 즉시 발송
     # 2) 정기 리포트: KST 09시(UTC 00시) 실행분만 발송
-    # 그 외 시간대: 발송 안 함 (체크만 하고 조용히 종료)
+    # 그 외 시간대: 발송 안 함 (체크만 하고 조용히 종료, AI 호출도 없음)
     now_utc = datetime.now(timezone.utc)
-    is_daily_report_hour = (now_utc.hour == 0)  # UTC 00시 = KST 09시
+    # is_daily_report_hour = (now_utc.hour == 0)  # UTC 00시 = KST 09시
+    is_daily_report_hour = True
 
-    if regime_changed:
-        send_telegram(msg)
-        print("sent: regime changed ->", regime)
-    elif is_daily_report_hour:
-        send_telegram("📋 [일일 정기 리포트]\n\n" + msg)
-        print("sent: daily report ->", regime)
+    if regime_changed or is_daily_report_hour:
+        # 발송이 확정된 경우에만 AI 해설 생성 (Haiku 헛호출 방지)
+        ai_comment = generate_ai_commentary({
+            "price_str": price_str,
+            "regime_kr": REGIME_KR[regime],
+            "adx": adx_now,
+            "plus_di": plus_di.iloc[-1],
+            "minus_di": minus_di.iloc[-1],
+            "bbw_pctl": bbw_pctl,
+            "ma_slope": ma200_slope_pct,
+            "fng": f"{fng_value} ({fng_label})" if fng_value is not None else "N/A",
+        })
+        if ai_comment:
+            lines += ["", "💬 <b>AI 해설</b>", ai_comment]
+
+        msg = "\n".join(lines)
+
+        if regime_changed:
+            send_telegram(msg)
+            print("sent: regime changed ->", regime)
+        else:
+            send_telegram("📋 [일일 정기 리포트]\n\n" + msg)
+            print("sent: daily report ->", regime)
     else:
         print("no alert (unchanged):", regime)
 
