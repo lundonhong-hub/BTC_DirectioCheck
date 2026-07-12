@@ -271,8 +271,8 @@ def main():
     # 2) 정기 리포트: KST 09시(UTC 00시) 실행분만 발송
     # 그 외 시간대: 발송 안 함 (체크만 하고 조용히 종료, AI 호출도 없음)
     now_utc = datetime.now(timezone.utc)
-    # is_daily_report_hour = (now_utc.hour == 0)  # UTC 00시 = KST 09시
-    is_daily_report_hour = True
+    is_daily_report_hour = (now_utc.hour == 0)  # UTC 00시 = KST 09시
+    # is_daily_report_hour = True
 
     if regime_changed or is_daily_report_hour:
         # 발송이 확정된 경우에만 AI 해설 생성 (Haiku 헛호출 방지)
