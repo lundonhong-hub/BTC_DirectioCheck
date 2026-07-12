@@ -190,7 +190,8 @@ def generate_ai_commentary(indicators: dict):
         return None
 
     # 들여쓰기 에러 방지를 위해 왼쪽 공백을 완벽하게 맞춘 프롬프트
-    prompt = (
+    
+      prompt = (
         f"다음은 비트코인 시장 레짐 모니터의 오늘 지표입니다:\n"
         f"- 현재가: {indicators['price_str']}\n"
         f"- 레짐 판정: {indicators['regime_kr']}\n"
@@ -199,16 +200,18 @@ def generate_ai_commentary(indicators: dict):
         f"- 볼린저밴드 폭 백분위: {indicators['bbw_pctl']*100:.0f}%\n"
         f"- 장기 이동평균선 기울기(10일): {indicators['ma_slope']:+.2f}%\n"
         f"- Fear & Greed Index: {indicators['fng']}\n\n"
-        f"위 지표를 종합하여 텔레그램 알림용 '초압축 핵심 요약'을 작성해주세요.\n\n"
+        f"위 지표를 종합하여 트레이더가 한눈에 읽기 편한 '두괄식 요약 리포트'를 작성해주세요.\n\n"
         f"[출력 규칙]\n"
         f"1. 반드시 아래의 [출력 양식] 형식을 그대로 유지하세요.\n"
-        f"2. 친절하고 장황한 설명 대신, 트레이더가 한눈에 파악할 수 있도록 단답형/개조식 문체(~함, ~임)를 사용하세요.\n"
+        f"2. 키워드만 툭툭 던지는 단답형 대신, '~함', '~임', '~ 추천'으로 끝나는 명확하고 완성된 문장으로 작성하세요.\n"
         f"3. 매수/매도 추천은 절대 금지하며, 마크다운이나 HTML 태그 없이 순수 텍스트로만 작성하세요.\n"
-        f"4. 전체 분량은 공백 포함 150자 이내로 극단적으로 압축하세요.\n\n"
+        f"4. 각 항목은 1~2문장 이내로 명확하게 인과관계를 설명해야 합니다.\n\n"
         f"[출력 양식]\n"
-        f"📢 요약: [시장 상황 한 줄 요약]\n"
-        f"🔍 지표: [핵심 지표 의미 압축]\n"
-        f"🤖 전략: [그리드매매 관점 대응 팁]"
+        f"📢 시장 요약: [오늘의 시장 핵심 상황을 두괄식으로 명확하게 한 문장 요약]\n"
+        f"🔍 지표 분석: [주요 수치(ADX, DI, 밴드폭 등)가 현재 어떤 상태를 뜻하는지 쉽게 설명]\n"
+        f"📈 추세/심리: [장기 이평선 기울기와 공포탐욕지수를 바탕으로 한 추세 및 투자 심리 진단]\n"
+        f"🤖 그리드 전략: [현재 레짐 국면에서 그리드매매/수동매매 시 주의하거나 취해야 할 스탠스]"
+    )
     )
 
     try:
@@ -326,8 +329,8 @@ def main():
     # 2) 정기 리포트: KST 09시(UTC 00시) 실행분만 발송
     # 그 외 시간대: 발송 안 함 (체크만 하고 조용히 종료, AI 호출도 없음)
     now_utc = datetime.now(timezone.utc)
-    is_daily_report_hour = (now_utc.hour == 0)  # UTC 00시 = KST 09시
-    # is_daily_report_hour = True
+    # is_daily_report_hour = (now_utc.hour == 0)  # UTC 00시 = KST 09시
+    is_daily_report_hour = True
 
     if regime_changed or is_daily_report_hour:
         # 발송이 확정된 경우에만 AI 해설 생성 (Haiku 헛호출 방지)
