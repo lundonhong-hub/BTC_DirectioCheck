@@ -203,7 +203,7 @@ def main():
         lines.insert(3, "")
     lines += [
         "",
-        f"· ADX(14): {adx_now:.1f}  (횡보<{ADX_RANGING_MAX} / 추세>{ADX_TRENDING_MIN})",
+        f"· ADX(14): {adx_now:.1f}  (횡보 {ADX_RANGING_MAX} 미만 / 추세 {ADX_TRENDING_MIN} 초과)",
         f"· +DI/-DI: {plus_di.iloc[-1]:.1f} / {minus_di.iloc[-1]:.1f}",
         f"· BB밴드폭 백분위: {bbw_pctl*100:.0f}% (높을수록 변동성 확장)",
         f"· {ma_window}일선 기울기(10일): {ma200_slope_pct:+.2f}%",
