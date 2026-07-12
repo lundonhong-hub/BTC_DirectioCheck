@@ -152,6 +152,61 @@ def save_state(regime):
                    "updated": datetime.now(timezone.utc).isoformat()}, f)
 
 
+def html_escape(text):
+    """텔레그램 HTML parse_mode 안전 처리"""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def generate_ai_commentary(indicators: dict):
+    """Claude Haiku로 초보자용 해설 생성. 실패 시 None 반환 (기본 리포트는 정상 발송)"""
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        print("[INFO] ANTHROPIC_API_KEY 미설정 -> AI 해설 생략")
+        return None
+
+    prompt = f"""다음은 비트코인 시장 레짐 모니터의 오늘 지표입니다:
+
+- 현재가: {indicators['price_str']}
+- 레짐 판정: {indicators['regime_kr']}
+- ADX(14): {indicators['adx']:.1f} (22 미만이면 횡보, 28 초과면 추세)
+- +DI: {indicators['plus_di']:.1f} / -DI: {indicators['minus_di']:.1f} (상승 힘 vs 하락 힘)
+- 볼린저밴드 폭 백분위: {indicators['bbw_pctl']*100:.0f}% (낮으면 변동성 수축, 높으면 확장)
+- 장기 이동평균선 기울기(10일): {indicators['ma_slope']:+.2f}%
+- Fear & Greed Index: {indicators['fng']}
+
+이 지표들을 종합해서 투자 초보자도 이해할 수 있게 한국어로 해설해주세요.
+규칙:
+- 첫 문장은 오늘 시장을 한 줄로 요약
+- 이어서 3~5문장으로 핵심 지표들이 무엇을 의미하는지 쉽게 풀어서 설명
+- 그리드매매(횡보장 전략) 관점에서 지금이 어떤 국면인지 한 문장 코멘트
+- 매수/매도 추천은 하지 말 것. 해석만 제공
+- 전체 250자 이내, 마크다운/HTML 태그 없이 순수 텍스트로만"""
+
+    try:
+        r = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 500,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+            timeout=60,
+        )
+        r.raise_for_status()
+        data = r.json()
+        text = "".join(b.get("text", "") for b in data.get("content", [])
+                       if b.get("type") == "text").strip()
+        return html_escape(text) if text else None
+    except Exception as e:
+        print(f"[WARN] AI 해설 생성 실패({e}) -> 해설 없이 발송")
+        return None
+
+
 def send_telegram(msg):
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
@@ -210,6 +265,20 @@ def main():
     ]
     if fng_value is not None:
         lines.append(f"· Fear & Greed: {fng_value} ({fng_label})")
+
+    # ── AI 해설 (Claude Haiku) ──
+    ai_comment = generate_ai_commentary({
+        "price_str": price_str,
+        "regime_kr": REGIME_KR[regime],
+        "adx": adx_now,
+        "plus_di": plus_di.iloc[-1],
+        "minus_di": minus_di.iloc[-1],
+        "bbw_pctl": bbw_pctl,
+        "ma_slope": ma200_slope_pct,
+        "fng": f"{fng_value} ({fng_label})" if fng_value is not None else "N/A",
+    })
+    if ai_comment:
+        lines += ["", "💬 <b>AI 해설</b>", ai_comment]
 
     msg = "\n".join(lines)
 
